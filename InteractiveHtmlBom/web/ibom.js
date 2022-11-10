@@ -658,7 +658,29 @@ function populateBomBody(placeholderColumn = null, placeHolderElements = null) {
             return;
           var valueSet = new Set();
           references.map(r => r[1]).forEach((id) => valueSet.add(pcbdata.bom.fields[id][field_index]));
-          td = document.createElement("TD");
+			td = document.createElement("TD");
+			if (column == "digikey") {
+				var valueSet2 = new Set();
+				valueSet.forEach(function(value) {
+					v = value.replace("/","%2f");
+
+					valueSet2.add('<a href=\'https://www.digikey.com/product-detail/en/x/x/'+v+'\'>' + value + '</a>');
+				})
+
+				valueSet = valueSet2;
+			} else if (column == "lcsc") {
+				var valueSet2 = new Set();
+				valueSet.forEach(function(value) {
+
+					v = value.replace("/","%2f");
+
+					valueSet2.add('<a href=\'https://lcsc.com/product-detail/x_'+v+'.html\'>' + value + '</a>');
+				})
+
+				valueSet = valueSet2;
+			}
+
+			
           td.innerHTML = highlightFilter(Array.from(valueSet).join(", "));
           tr.appendChild(td);
         }
