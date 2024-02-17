@@ -71,16 +71,18 @@ function drawText(ctx, text, color) {
     var offsetx = -lineWidth * (text.justify[0] + 1) / 2;
     var inOverbar = false;
     for (var j = 0; j < txt[i].length; j++) {
-      if (txt[i][j] == '\t') {
-        var fourSpaces = 4 * pcbdata.font_data[' '].w * text.width;
-        offsetx += fourSpaces - offsetx % fourSpaces;
-        continue;
-      } else if (txt[i][j] == '~') {
-        j++;
-        if (j == txt[i].length)
-          break;
-        if (txt[i][j] != '~') {
-          inOverbar = !inOverbar;
+      if (config.kicad_text_formatting) {
+        if (txt[i][j] == '\t') {
+          var fourSpaces = 4 * pcbdata.font_data[' '].w * text.width;
+          offsetx += fourSpaces - offsetx % fourSpaces;
+          continue;
+        } else if (txt[i][j] == '~') {
+          j++;
+          if (j == txt[i].length)
+            break;
+          if (txt[i][j] != '~') {
+            inOverbar = !inOverbar;
+          }
         }
       }
       var glyph = pcbdata.font_data[txt[i][j]];
@@ -327,6 +329,7 @@ function drawFootprint(ctx, layer, scalefactor, footprint, colors, highlight, ou
       ctx.fillRect(0, 0, ...footprint.bbox.size);
       ctx.globalAlpha = 1;
       ctx.strokeStyle = colors.pad;
+      ctx.lineWidth = 3 / scalefactor;
       ctx.strokeRect(0, 0, ...footprint.bbox.size);
       ctx.restore();
     }
@@ -337,12 +340,15 @@ function drawFootprint(ctx, layer, scalefactor, footprint, colors, highlight, ou
       drawDrawing(ctx, scalefactor, drawing.drawing, colors.pad);
     }
   }
+  ctx.lineWidth = 3 / scalefactor;
   // draw pads
   if (settings.renderPads) {
     for (var pad of footprint.pads) {
       if (pad.layers.includes(layer)) {
         drawPad(ctx, pad, colors.pad, outline);
-        if (pad.pin1 && settings.highlightpin1) {
+        if (pad.pin1 &&
+          (settings.highlightpin1 == "all" ||
+            settings.highlightpin1 == "selected" && highlight)) {
           drawPad(ctx, pad, colors.outline, true);
         }
       }
@@ -408,39 +414,67 @@ function drawBgLayer(layername, canvas, layer, scalefactor, edgeColor, polygonCo
   }
 }
 
-function drawTracks(canvas, layer, color, highlight) {
+function drawTracks(canvas, layer, defaultColor, highlight) {
   ctx = canvas.getContext("2d");
-  ctx.strokeStyle = color;
   ctx.lineCap = "round";
+
+  var hasHole = (track) => (
+    'drillsize' in track &&
+    track.start[0] == track.end[0] &&
+    track.start[1] == track.end[1]);
+
+  // First draw tracks and tented vias
   for (var track of pcbdata.tracks[layer]) {
     if (highlight && highlightedNet != track.net) continue;
-    ctx.lineWidth = track.width;
-    ctx.beginPath();
-    if ('radius' in track) {
-      ctx.arc(
-        ...track.center,
-        track.radius,
-        deg2rad(track.startangle),
-        deg2rad(track.endangle));
-    } else {
+    if (!hasHole(track)) {
+      ctx.strokeStyle = highlight ? defaultColor : settings.netColors[track.net] || defaultColor;
+      ctx.lineWidth = track.width;
+      ctx.beginPath();
+      if ('radius' in track) {
+        ctx.arc(
+          ...track.center,
+          track.radius,
+          deg2rad(track.startangle),
+          deg2rad(track.endangle));
+      } else {
+        ctx.moveTo(...track.start);
+        ctx.lineTo(...track.end);
+      }
+      ctx.stroke();
+    }
+  }
+  // Second pass to draw untented vias
+  var style = getComputedStyle(topmostdiv);
+  var holeColor = style.getPropertyValue('--pad-hole-color')
+
+  for (var track of pcbdata.tracks[layer]) {
+    if (highlight && highlightedNet != track.net) continue;
+    if (hasHole(track)) {
+      ctx.strokeStyle = highlight ? defaultColor : settings.netColors[track.net] || defaultColor;
+      ctx.lineWidth = track.width;
+      ctx.beginPath();
       ctx.moveTo(...track.start);
       ctx.lineTo(...track.end);
+      ctx.stroke();
+      ctx.strokeStyle = holeColor;
+      ctx.lineWidth = track.drillsize;
+      ctx.lineTo(...track.end);
+      ctx.stroke();
     }
-    ctx.stroke();
   }
 }
 
-function drawZones(canvas, layer, color, highlight) {
+function drawZones(canvas, layer, defaultColor, highlight) {
   ctx = canvas.getContext("2d");
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
   ctx.lineJoin = "round";
   for (var zone of pcbdata.zones[layer]) {
+    if (highlight && highlightedNet != zone.net) continue;
+    ctx.strokeStyle = highlight ? defaultColor : settings.netColors[zone.net] || defaultColor;
+    ctx.fillStyle = highlight ? defaultColor : settings.netColors[zone.net] || defaultColor;
     if (!zone.path2d) {
       zone.path2d = getPolygonsPath(zone);
     }
-    if (highlight && highlightedNet != zone.net) continue;
-    ctx.fill(zone.path2d);
+    ctx.fill(zone.path2d, zone.fillrule || "nonzero");
     if (zone.width > 0) {
       ctx.lineWidth = zone.width;
       ctx.stroke(zone.path2d);
@@ -464,13 +498,13 @@ function clearCanvas(canvas, color = null) {
 
 function drawNets(canvas, layer, highlight) {
   var style = getComputedStyle(topmostdiv);
-  if (settings.renderTracks) {
-    var trackColor = style.getPropertyValue(highlight ? '--track-color-highlight' : '--track-color');
-    drawTracks(canvas, layer, trackColor, highlight);
-  }
   if (settings.renderZones) {
     var zoneColor = style.getPropertyValue(highlight ? '--zone-color-highlight' : '--zone-color');
     drawZones(canvas, layer, zoneColor, highlight);
+  }
+  if (settings.renderTracks) {
+    var trackColor = style.getPropertyValue(highlight ? '--track-color-highlight' : '--track-color');
+    drawTracks(canvas, layer, trackColor, highlight);
   }
   if (highlight && settings.renderPads) {
     var padColor = style.getPropertyValue('--pad-color-highlight');

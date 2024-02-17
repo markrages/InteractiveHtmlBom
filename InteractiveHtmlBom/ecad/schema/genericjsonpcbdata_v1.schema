@@ -88,6 +88,9 @@
                 "nets": {
                     "type": "array",
                     "items": { "type": "string" }
+                },
+                "font_data": {
+                    "$ref": "#/definitions/FontData"
                 }
             },
             "required": [
@@ -516,6 +519,7 @@
                         "start": { "$ref": "#/definitions/Coordinates" },
                         "end": { "$ref": "#/definitions/Coordinates" },
                         "width": { "type": "number" },
+                        "drillsize": { "type": "number" },
                         "net": { "type": "string" }
                     },
                     "required": [
@@ -568,7 +572,14 @@
                 "polygons": {
                     "$ref": "#/definitions/Polygons"
                 },
-                "net": { "type": "string" }
+                "net": { "type": "string" },
+                "fillrule": {
+                    "type": "string",
+                    "enum": [
+                        "nonzero",
+                        "evenodd"
+                    ]
+                }
             },
             "anyOf": [
                 { "required": [ "svgpath" ] },
@@ -584,6 +595,9 @@
                     "$ref": "#/definitions/Coordinates"
                 }
             }
+        },
+        "PolyLineArray": {
+            "$ref": "#/definitions/Polygons"
         },
         "ReferenceSet": {
             "type": "array",
@@ -602,6 +616,23 @@
             "properties": {
             },
             "title": "ExtraData"
+        },
+        "FontData": {
+            "type": "object",
+            "patternProperties": {
+                "^.$" : {
+                    "type": "object",
+                    "properties": {
+                        "w": { "type": "number" },
+                        "l": { "$ref": "#/definitions/PolyLineArray" }
+                    },
+                    "additionalProperties" : false,
+                    "required": [
+                        "w",
+                        "l"
+                    ]
+                }
+            }
         }
     }
 }
