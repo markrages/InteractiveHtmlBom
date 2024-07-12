@@ -713,7 +713,7 @@ function populateBomBody(placeholderColumn = null, placeHolderElements = null) {
 				  v = item.replace("/","%2f");	  
 				  output.push('<a href=\'https://www.digikey.com/product-detail/en/x/x/'+v+'\'>' + visible + '</a>');
 
-			  } else if (column == "lcsc") {
+			  } else if (column == "LCSC Part #") {
 				  v = item.replace("/","%2f");
 				  output.push('<a href=\'https://lcsc.com/product-detail/x_'+v+'.html\'>' + visible + '</a>');
 				  
